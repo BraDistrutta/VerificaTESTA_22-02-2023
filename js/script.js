@@ -1,30 +1,112 @@
-/*
-    TESTO DELLA VERIFICA DI TPSIT
-    Viene richiesto di modificare i file html, js e php in modo tale da:
 
-    - visualizzare DINAMICAMENTE gli utenti nell'aside 
-        # ogni utente è un nuovo LI
-        # ogni utente in base al genere dovrà essere raffigurato tramite l'icona corretta
-        # sotto l'icona dovrà essere rafficurato il nome con l'iniziale maiuscola del nome e l'iniziale maiuscola del cognome
-        # il cognome dovrà essere troncato e seguito da . (come si vede nel file originale)
+let utenti;
+let messaggi;
+const ora = new Date();
 
-    - aggiornare automaticamente l'header della sezione nel momento in cui clicco su un utente dell'aside
-        # modificare l'icona
-        # modificare il nome e cognome
-        # aggiornare l'ora in base all'ora dell'ultimo messaggio inviato dall'utente selezionato
-    
-    - aggiornare i messaggio in base all'ora attuale
-        #NOTA: se un messaggio è stato inviato alle 12:30 e ora sono le 12:15 non deve essere visualizzato
-        #Deve essere quindi impostato un timer che ogni minuto controlli l' "arrivo" di nuovi messaggi e aggiorni la sezione più interna
-        #Non importa se si utilizza ut1 per l'utente 0 o ut2, l'importante è la coerenza
-        #Il timer deve essere impostato durante la richiesta dei dati relativi all'utente dopo la selezione nell'aside
+window.onload = function() {
+    let promise1 = fetch("http://localhost:63342/VerificaTESTA_22-02-2023/server/utenti.php");
 
-    - CONTA POCHISSIMO. Gestite il bottone di invio in basso aggiungendo il messaggio in coda agli altri SOLO LATO CLIENT.
-        (Da fare alla fine per chi ha fatto il resto o non riesce a fare altro).
-        #Aggiungere dinamicamente lato client
-        #Creare sempre lato client un oggetto json con le informazioni che SI DOVREBBERO aggiungere lato server nel array opportuno
-    
-    NOTA. Non è possibile fare cache dei dati in array, è possibile salvare i codici nella pagina web, 
-            tutto il resto deve essere prelevato dal server
+    promise1.then(
+        async (risposta)=>{
+            utenti = await risposta.json();
+            aggiornaUtenti();
+            let promise2 = fetch("http://localhost:63342/VerificaTESTA_22-02-2023/server/messaggi.php");
+            promise2.then(
+                async (risposta)=>{
+                    messaggi = await risposta.json();
+                    aggiornaHeader(1);
+                }
+            )
+        }
+    )
 
-*/
+
+}
+
+function aggiornaUtenti() {
+    let _listUtenti = document.querySelector("#listUtenti");
+    _listUtenti.innerHTML="";
+
+
+    for(let i=1;i<utenti.length;i++){
+        let nomeUtente = utenti[i].nome + " " + utenti[i].cognome.substring(0,1) + ".";
+        let genereUtente;
+        if(utenti[i].genere == "m")
+            genereUtente = "face";
+        else
+            genereUtente = "face_3";
+
+        let utente = `<li onclick="aggiornaHeader(` + utenti[i].codUt + `)">
+                        <div class="material-symbols-outlined icone">` +
+                            genereUtente
+                        + `</div> ` +
+                        nomeUtente
+                        + `</li>`;
+
+        _listUtenti.innerHTML += utente;
+    }
+}
+
+function aggiornaMessaggi(codDestinatario) {
+    let _sectionMessaggi = document.querySelector("#sectionMessaggi");
+    _sectionMessaggi.innerHTML="";
+
+
+    for(let i=0;i<messaggi.length;i++){
+        let classUt = (i%2)+1;
+        let messaggio = "";
+        let mess = messaggi[i].mes;
+
+        if((messaggi[i].codMit=="0" || messaggi[i].codDest=="0") && (messaggi[i].codMit==codDestinatario || messaggi[i].codDest==codDestinatario)){
+            if(messaggi[i].orainvio.substring(0,2)<ora.getHours())
+                messaggio = `<article class="mes ut`+classUt+`">`+ mess +`</article>`;
+            else if (messaggi[i].orainvio.substring(0,2)==ora.getHours())
+                if(messaggi[i].orainvio.substring(3,5)<=ora.getMinutes())
+                    messaggio = `<article class="mes ut`+classUt+`">`+ mess +`</article>`;
+
+
+            _sectionMessaggi.innerHTML += messaggio;
+        }
+
+
+    }
+}
+
+function aggiornaHeader(codUtente) {
+    let _headerUtente = document.querySelector("#headerUtente");
+    _headerUtente.innerHTML="";
+
+    let nomeUtente = utenti[codUtente].nome + " " + utenti[codUtente].cognome;
+    let genereUtente;
+    if(utenti[codUtente].genere == "m")
+        genereUtente = "face";
+    else
+        genereUtente = "face_3";
+
+    let oraMess = "00:00";
+    for(let i=0;i<messaggi.length;i++){
+        if((codUtente.toString() == messaggi[i].codMit) && (messaggi[i].codDest=="0")){
+            if(messaggi[i].orainvio.substring(0,2)<=ora.getHours()){
+                if(messaggi[i].orainvio.substring(0,2)>oraMess.substring(0,2))
+                    oraMess = messaggi[i].orainvio;
+                else if(messaggi[i].orainvio.substring(0,2)==oraMess.substring(0,2)){
+                    if(messaggi[i].orainvio.substring(3,5)<=ora.getMinutes()) {
+                        if (messaggi[i].orainvio.substring(3, 5) == oraMess.substring(3, 5))
+                            oraMess = messaggi[i].orainvio;
+                    }
+                }
+            }
+        }
+    }
+
+    _headerUtente.innerHTML += `<div class="material-symbols-outlined icone">`+
+                                    genereUtente
+                                +`</div>
+                                <div>
+                                    <div id="divNome">`+nomeUtente+`</div>
+                                    <div id="divUltimoMes">Oggi alle `+ oraMess +`</div>
+                                </div>`;
+
+    aggiornaMessaggi(codUtente);
+}
+
